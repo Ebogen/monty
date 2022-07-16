@@ -1,6 +1,8 @@
 #ifndef MONTY_H
 #define MONTY_H
 
+#define _GNU_SOURCE
+#define _POSIX_C_SOURCE  200809L
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
@@ -10,8 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#define _GNU_SOURCE
-#define _POSIX_C_SOURCE  200809L
 
 #define err_ac() fprintf(stderr, "USAGE: monty file\n")
 #define err_fopen(name) fprintf(stderr, "Error: Can't open file %s\n", name)
@@ -93,4 +93,4 @@ stack_t *get_dnodeint_at_index(stack_t *head, unsigned int index);
 stack_t *insert_dnodeint_at_index(stack_t **h, unsigned int idx, int n);
 int delete_dnodeint_at_index(stack_t **head, unsigned int index);
 
-#endif
+#endif /* __ Monty_h__ */
