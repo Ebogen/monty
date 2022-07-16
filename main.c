@@ -1,101 +1,154 @@
 #include "monty.h"
+#include <stdio.h>
 
-global_t globalv;
+stack_t *h;
+FILE *file;
+char *value;
+int mode;
+char *cmd;
 
 /**
- * free_globalv - this is a function that frees
- *                the global variables
- * Return: Here we return nothing
+ * stack_queue - a function that sets the format of the data
+ *		 to stack and queue.
+ * @stack: reppresenst a pointer to a pointer to the begining
+ *         of the stack implementation list.
+ * @line_number: represents the line number
+ * Return: nothing
  */
-void free_globalv(void)
+
+void stack_queue(stack_t **stack, unsigned int line_number)
 {
-	free_dlistint(globalv.head);
-	free(globalv.buff);
-	fclose(globalv.fdes);
+	(void)stack;
+	(void)line_number;
+
+	if (strcmp(cmd, "queue") == 0)
+		mode = 1;
+	else
+		mode = 0;
 }
 
 /**
- * start_globalv - this is a function initializes
- *                 the global variables
- * @fdes: file descriptor
- * Return: no return
+ * get_func - Used to map functions to the corresponding
+ *	      opcode.
+ * @opcode: The opcode from the instruction.
+ * Return: A pointer to the function.
  */
-void start_globalv(FILE *fdes)
-{
-	globalv.lifo = 1;
-	globalv.curln = 1;
-	globalv.secln = NULL;
-	globalv.head = NULL;
-	globalv.fdes = fdes;
-	globalv.buff = NULL;
-}
 
-/**
- * check_input - this is a function that checks if the file
- *               exists and if the file can and can be opened
- * @argc: represents the argument count
- * @argv: represents the argument vector
- * Return: here we return the file struct
- */
-FILE *check_input(int argc, char *argv[])
+void (*get_func(char *opcode))(stack_t**, unsigned int)
 {
-	FILE *fdes;
+	int index = 0;
 
-	if (argc == 1 || argc > 2)
+	instruction_t ops[] = {
+		{"push", push},
+		{"pall", pall},
+		{"pint", pint},
+		{"pop", pop},
+		{"swap", swap},
+		{"add", add},
+		{"nop", nop},
+		{"sub", sub},
+		{"div", divt},
+		{"mul", mul},
+		{"mod", mod},
+		{"pchar", pchar},
+		{"pstr", pstr},
+		{"rotl", rotl},
+		{"rotr", rotr},
+		{"queue", stack_queue},
+		{"stack", stack_queue},
+		{NULL, NULL}
+	};
+
+	while (ops[index].opcode)
 	{
-		dprintf(2, "USAGE: monty file\n");
-		exit(EXIT_FAILURE);
+		if (strcmp(opcode, ops[index].opcode) == 0)
+			return (ops[index].f);
+		index++;
 	}
 
-	fdes = fopen(argv[1], "r");
-
-	if (fdes == NULL)
-	{
-		dprintf(2, "Error: Can't open file %s\n", argv[1]);
-		exit(EXIT_FAILURE);
-	}
-
-	return (fdes);
+	return (NULL);
 }
 
 /**
- * main -This function represents the Entry point
- * @argc: represents the argument count
- * @argv: represents the argument vector
- * Return: here we return 0 on success
+ * run_monty - Represents a func that runs the opcode command.
+ * @buffer: The line instruction read from the given file.
+ * @line_number: The line number.
+ * Return: nothing
  */
-int main(int argc, char *argv[])
-{
-	void (*func)(stack_t **stack, unsigned int line_number);
-	FILE *fdes;
-	size_t size = 256;
-	ssize_t nlines = 0;
-	char *lines[2] = {NULL, NULL};
 
-	fdes = check_input(argc, argv);
-	start_globalv(fdes);
-	nlines = getline(&globalv.buff, &size, fdes);
-	while (nlines != -1)
+void run_monty(char *buffer, unsigned int line_number)
+{
+	void (*f)(stack_t**, unsigned int);
+
+	cmd = strtok(buffer, " \r\t\n");
+
+	if (cmd && cmd[0] != '#')
 	{
-		lines[0] = _strtoky(globalv.buff, " \t\n");
-		if (lines[0] && lines[0][0] != '#')
+		f = get_func(cmd);
+
+		if (f != NULL)
 		{
-			func = get_opcodes(lines[0]);
-			if (!func)
-			{
-				dprintf(2, "L%u: ", globalv.cont);
-				dprintf(2, "unknown instruction %s\n", lines[0]);
-				free_globalv();
-				exit(EXIT_FAILURE);
-			}
-			globalv.arg = _strtoky(NULL, " \t\n");
-			func(&globalv.head, globalv.cont);
+			if (strcmp(cmd, "push") == 0)
+				value = strtok(NULL, " \r\t\n");
+			f(&h, line_number);
 		}
-		nlines = getline(&globalv.buff, &size, globalv);
-		globalv.cont++;
+		else
+		{
+			err_op(line_number, cmd);
+			if (buffer)
+				free(buffer);
+			if (h)
+				free_dlistint(h);
+			exit(EXIT_FAILURE);
+		}
+	}
+}
+
+/**
+ * main - Represents the main entry point for the
+ *        monty Interpreter.
+ * @ac: Represnts the number of arguments passed to the program.
+ * @av: represents A pointer to an array of characters.
+ * Return: the value (EXIT_SUCCESS) on success (EXIT_FAILURE) on error
+ */
+
+int main(int ac, char **av)
+{
+	size_t status;
+	char *buffer = NULL;
+	unsigned int line_number = 0;
+
+	h = NULL;
+	value = NULL;
+	file = NULL;
+	mode = 0;
+	cmd = NULL;
+
+	if (ac != 2)
+	{
+		err_ac();
+		exit(EXIT_FAILURE);
 	}
 
-	free_globalv();
+	file = fopen(av[1], "r");
+	if (file == NULL)
+	{
+		err_fopen(av[1]);
+		exit(EXIT_FAILURE);
+	}
 
-	return (0);
+	while (getline(&buffer, &status, file) != EOF)
+	{
+		line_number++;
+		if (buffer[0] != '\n')
+			run_monty(buffer, line_number);
+	}
+
+	if (buffer)
+		free(buffer);
+	if (h)
+		free_dlistint(h);
+
+	fclose(file);
+	return (EXIT_SUCCESS);
 }
